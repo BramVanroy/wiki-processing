@@ -50,7 +50,7 @@ def parse_json(line, pdout):
 
     slug = slugify(obj['title'], max_length=36)
     filename = f"{slug}-{obj['id']}.txt" if slug else f"{obj['id']}.txt"
-    initial_dir = pdout.joinpath(get_initials(filename))
+    initial_dir = pdout.joinpath(get_initials(slug))
     initial_dir.mkdir(exist_ok=True)
     filename = initial_dir.joinpath(filename)
 
@@ -72,18 +72,42 @@ def process_file(pfin, pdout):
     return pfin.name, article_n
 
 
+def _multi_main(pdin, pdout, njobs):
+    total_articles_n = 0
+    files = (pfin for pfin in pdin.rglob('*') if pfin.is_file())
+
+    with futures.ThreadPoolExecutor(max_workers=njobs) as executor:
+        print(f"Processing dir {str(pdin)} with {default_jobs} threads...")
+        for filename, article_n in executor.map(lambda f: process_file(f, pdout), files):
+            total_articles_n += article_n
+            print(f"Wrote {article_n} articles from file {filename}...")
+
+    return total_articles_n
+
+
+def _single_main(pdin, pdout):
+    print(f"Processing dir {str(pdin)} single-threaded...")
+    total_articles_n = 0
+    files = (pfin for pfin in pdin.rglob('*') if pfin.is_file())
+
+    for pfin in files:
+        filename, article_n = process_file(pfin, pdout)
+        total_articles_n += article_n
+        print(f"Wrote {article_n} articles from file {filename}...")
+
+    return total_articles_n
+
+
 def main(pdin, pdout, njobs):
     """
     Iterate over all subdirectories and process all files with 'parse_json'
     """
     start_time = time.time()
-    total_articles_n = 0
-    files = (pfin for pfin in pdin.rglob('*') if pfin.is_file())
-    with futures.ThreadPoolExecutor(max_workers=njobs) as executor:
-        print(f"Processing dir {str(pdin)} with {default_jobs} threads...")
-        for file_idx, (filename, article_n) in enumerate(executor.map(lambda f: process_file(f, pdout), files)):
-            total_articles_n += article_n
-            print(f"Wrote {article_n} articles from file {filename}...")
+
+    if njobs == 1:
+        total_articles_n = _single_main(pdin, pdout)
+    else:
+        total_articles_n = _multi_main(pdin, pdout, njobs)
 
     print(f"Finished! Wrote {total_articles_n} articles in {time.time() - start_time:.0F} seconds.")
 
