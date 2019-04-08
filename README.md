@@ -47,6 +47,7 @@ optional arguments:
 ```
 
 ## Requirements (cf. Pipfile)
+ - Python 3.6 or higher
  - [spaCy](https://spacy.io/usage/)
  - a spaCy [language model](https://spacy.io/usage/models) (en_core_web_sm by default)
  - [python-slugify](https://github.com/un33k/python-slugify)
@@ -54,7 +55,9 @@ optional arguments:
 For the lazy:
 
 ```bash
-pipenv install spacy python-slugify
+git clone https://github.com/BramVanroy/wiki-processing.git
+cd wiki-processing
+pipenv install
 pipenv run python -m spacy download en_core_web_sm
 ```
 
