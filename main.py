@@ -91,6 +91,8 @@ def main(pdin, pdout, njobs):
 
     with ProcessPoolExecutor(max_workers=njobs) as executor:
         print(f"Processing dir {str(pdin)} with {njobs} threads...")
+        # To pass the output directory to 'process_file', just repeat it.
+        # files and repeat(pdout) are then iterated and passed to 'process_file'
         for filename, article_n in executor.map(process_file, files, repeat(pdout)):
             total_articles_n += article_n
             print(f"\rWrote {article_n} articles from file {filename}...", end='', flush=True)
