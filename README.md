@@ -46,6 +46,17 @@ optional arguments:
                         (default: en_core_web_sm)
 ```
 
+## Requirements (cf. Pipfile)
+ - [spaCy](https://spacy.io/usage/)
+ - a spaCy [language model](https://spacy.io/usage/models) (en_core_web_sm by default)
+ - [python-slugify](https://github.com/un33k/python-slugify)
+ 
+For the lazy:
+
+```bash
+pipenv install spacy python-slugify
+pipenv run python -m spacy download en_core_web_sm
+```
 
 ## Important note
 Because of how I implemented the sentence boundary detection through spaCy, consecutive direct speech clauses are not segmented. 
