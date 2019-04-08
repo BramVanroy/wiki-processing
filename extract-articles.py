@@ -65,7 +65,7 @@ class ArticleExtractor:
             logging.info(f"Processing dir {str(self.pdin)} with {self.n_jobs} workers...")
             for filename, article_n in executor.map(self.process_file, files):
                 total_articles_n += article_n
-                logging.info(f"\rWrote {article_n} articles from file {filename}...")
+                logging.info(f"Wrote {article_n} articles from file {filename}...")
 
         logging.info(f"\nFinished! Wrote {total_articles_n} articles in {time.time() - start_time:.0F} seconds.")
 
