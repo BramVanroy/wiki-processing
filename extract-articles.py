@@ -1,5 +1,6 @@
 from concurrent.futures import ProcessPoolExecutor
 import json
+import logging
 from math import inf
 from os import cpu_count
 from pathlib import Path
@@ -7,6 +8,11 @@ import time
 
 from slugify import slugify
 import spacy
+
+logging.basicConfig(datefmt='%d-%b %H:%M:%S',
+                    format='%(asctime)s - [%(levelname)s]: %(message)s',
+                    level=logging.INFO)
+
 """
     Processes the JSON output of WikiExtractor in parallel: creates one file per Wikipedia article.
     Filenames are unique and based on the ID and title of the article.
@@ -38,6 +44,7 @@ class ArticleExtractor:
         if not no_segmentation:
             self.nlp = spacy.load(spacy_model, disable=['ner', 'textcat'])
             self.nlp.add_pipe(ArticleExtractor.prevent_wrapped_sbd, name='prevent-wrapped-sbd', before='parser')
+            logging.info(f"Using spaCy model '{spacy_model}'")
 
         self.pdin = None
         self.pdout = None
@@ -55,12 +62,12 @@ class ArticleExtractor:
         files = (pfin for pfin in self.pdin.rglob('*') if pfin.is_file())
 
         with ProcessPoolExecutor(max_workers=self.n_jobs) as executor:
-            print(f"Processing dir {str(self.pdin)} with {self.n_jobs} threads...")
+            logging.info(f"Processing dir {str(self.pdin)} with {self.n_jobs} workers...")
             for filename, article_n in executor.map(self.process_file, files):
                 total_articles_n += article_n
-                print(f"\rWrote {article_n} articles from file {filename}...", end='', flush=True)
+                logging.info(f"\rWrote {article_n} articles from file {filename}...")
 
-        print(f"\nFinished! Wrote {total_articles_n} articles in {time.time() - start_time:.0F} seconds.")
+        logging.info(f"\nFinished! Wrote {total_articles_n} articles in {time.time() - start_time:.0F} seconds.")
 
     def parse_json(self, line):
         """
@@ -214,9 +221,9 @@ if __name__ == '__main__':
     parser.add_argument('--min-tokens', type=int, default=None,
                         help="sentences with less than 'min_tokens' won't be included in the output.")
     parser.add_argument('-n', '--n-jobs', type=int, default=DEFAULT_WORKERS,
-                        help=f"number of threads to use (default: {DEFAULT_WORKERS}).")
+                        help=f"number of workers to use (default: {DEFAULT_WORKERS}).")
     parser.add_argument('--no-segmentation', action='store_true', default=False,
-                        help='by default, the output will print one sentence per line. This option prevents such'
+                        help='by default, the output will write one sentence per line. This option prevents such'
                              ' line segmentation.')
     parser.add_argument('--no-tokenized-output', action='store_true', default=False,
                         help="do not tokenize the articles.")
@@ -231,7 +238,6 @@ if __name__ == '__main__':
     if args.raw:
         args.keep_headings = True
         args.no_segmentation = True
-    del args.raw
 
     extractor = ArticleExtractor(args.keep_headings,
                                  args.max_tokens,
