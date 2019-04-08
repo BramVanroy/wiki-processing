@@ -67,7 +67,7 @@ class ArticleExtractor:
                 total_articles_n += article_n
                 logging.info(f"Wrote {article_n} articles from file {filename}...")
 
-        logging.info(f"\nFinished! Wrote {total_articles_n} articles in {time.time() - start_time:.0F} seconds.")
+        logging.info(f"Finished! Wrote {total_articles_n} articles in {time.time() - start_time:.0F} seconds.")
 
     def parse_json(self, line):
         """
