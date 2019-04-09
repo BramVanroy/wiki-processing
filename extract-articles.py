@@ -4,6 +4,7 @@ import logging
 from math import inf
 from os import cpu_count
 from pathlib import Path
+import re
 import time
 
 from slugify import slugify
@@ -40,6 +41,7 @@ class ArticleExtractor:
         self.n_jobs = n_jobs
         self.no_segmentation = no_segmentation
         self.no_tokenized_output = no_tokenized_output
+        self.tag_regex = re.compile(r'<[^>]*>')
 
         if not no_segmentation:
             self.nlp = spacy.load(spacy_model, disable=['ner', 'textcat'])
@@ -51,7 +53,7 @@ class ArticleExtractor:
 
     def extract_articles(self, din, dout):
         """
-        Iterate over all subdirectories and process all files with 'process_file'
+        Iterate over all subdirectories and process all files with 'process_file'.
         """
         self.pdin = Path(din).resolve()
         self.pdout = Path(dout).resolve()
@@ -59,15 +61,18 @@ class ArticleExtractor:
         start_time = time.time()
 
         total_articles_n = 0
+        total_lines_n = 0
         files = (pfin for pfin in self.pdin.rglob('*') if pfin.is_file())
 
         with ProcessPoolExecutor(max_workers=self.n_jobs) as executor:
             logging.info(f"Processing dir {str(self.pdin)} with {self.n_jobs} workers...")
-            for filename, article_n in executor.map(self.process_file, files):
-                total_articles_n += article_n
-                logging.info(f"Wrote {article_n} articles from file {filename}...")
+            for filename, articles_n, lines_n in executor.map(self.process_file, files):
+                total_articles_n += articles_n
+                total_lines_n += lines_n
+                logging.info(f"Wrote {articles_n} articles from file {filename}...")
 
-        logging.info(f"Finished! Wrote {total_articles_n} articles in {time.time() - start_time:.0F} seconds.")
+        logging.info(f"Finished! Wrote {total_articles_n} articles ({total_lines_n} lines)"
+                     f" in {time.time() - start_time:.0F} seconds.")
 
     def parse_json(self, line):
         """
@@ -83,33 +88,39 @@ class ArticleExtractor:
         initial_dir.mkdir(exist_ok=True)
         filename = initial_dir.joinpath(filename)
 
-        text = self.process_text(obj['text'])
+        text, lines_n = self.process_text(obj['text'])
         # 'text' can be None, e.g. due to a max-tokens value
         if text:
             with open(filename, 'w', encoding='utf-8') as fhout:
                 fhout.write(text)
+
+        return lines_n
 
     def process_file(self, pfin):
         """
         Process all lines in a file with 'parse_json'.
         One JSON object per line.
         """
-        article_n = 0
+        articles_n = 0
+        lines_n = 0
         with open(pfin, 'r', encoding='utf-8') as fhin:
             for line in fhin:
                 line = line.strip()
 
                 if line == '':
                     continue
-                article_n += 1
-                self.parse_json(line)
+                articles_n += 1
+                lines_n += self.parse_json(line)
 
-        return pfin.name, article_n
+        return pfin.name, articles_n, lines_n
 
     def process_text(self, text):
         """ Given raw text, process it as required: remove headings and/or segment it with 'segment_text'."""
         # Clean left-over parentheses
         text = text.replace('()', '')
+        # Remove any tags (but not their contents)
+        text = re.sub(self.tag_regex, '', text)
+
         # Split on new line and remove empty lines
         lines = list(filter(None, text.split('\n')))
 
@@ -119,8 +130,9 @@ class ArticleExtractor:
         if not self.no_segmentation:
             lines = self.segment_text(lines)
 
+        lines_n = len(lines) if lines else 0
         text = '\n'.join(lines) if lines else None
-        return text
+        return text, lines_n
 
     def segment_text(self, lines):
         """ Segment text into sentences. If required, also tokenize the output."""
@@ -148,7 +160,7 @@ class ArticleExtractor:
 
     @staticmethod
     def get_char_at_idx(filename, idx):
-        """ Get character at index 'idx', return None for IndexError. """
+        """ Get character at index 'idx', return None for IndexError."""
         try:
             c = filename[idx].lower()
         except IndexError:
